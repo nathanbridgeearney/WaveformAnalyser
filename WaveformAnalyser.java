@@ -1,7 +1,7 @@
 // This program is copyright VUW.
 // You are granted permission to use it to construct your answer to a COMP102 assignment.
 // You may not distribute it in any other way without permission.
-
+//Worked with sam mata
 /* Code for COMP-102-112 - 2021T1, Assignment 8
  * Name:
  * Username:
@@ -10,8 +10,7 @@
 
 import ecs100.*;
 
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
+
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -47,7 +46,7 @@ import java.awt.Color;
 
 public class WaveformAnalyser {
 
-    // Constants: 
+    // Constants:
     public static final int ZERO_LINE = 300;    // dimensions of the graph for the display method
     public static final int GRAPH_LEFT = 10;
     public static final int GRAPH_WIDTH = 800;
@@ -56,11 +55,13 @@ public class WaveformAnalyser {
     public static final double THRESHOLD = 200;  // threshold for the distortion level
     public static final int CIRCLE_SIZE = 10;    // size of the circles for the highlightPeaks method
 
-    // Fields 
+    // Fields
     private ArrayList<Double> waveform;   // the field to hold the ArrayList of values
 
     private int regionStart = 0; // The index of the first value in the selected region
     private int regionEnd;       // The index one past the last value in the selected region
+    public static double min, max;
+    public static int localWidth;
 
     /**
      * Set up the user interface
@@ -111,6 +112,14 @@ public class WaveformAnalyser {
 
         // plot points: blue line between each pair of values
         /*# YOUR CODE HERE */
+        UI.setColor(Color.BLUE);
+        localWidth = (GRAPH_WIDTH / waveform.size());
+        double prev = 0, value;
+        for (int i = 0; i < waveform.size(); i++) {
+            value = waveform.get(i);
+            UI.drawLine((i * localWidth) + GRAPH_LEFT, ZERO_LINE + prev, ((i + 1) * localWidth) + GRAPH_LEFT, ZERO_LINE + value);
+            prev = value;
+        }
 
         this.displayRegion();  // Displays the selected region, if any
     }
@@ -127,20 +136,17 @@ public class WaveformAnalyser {
     public void read() {
         UI.clearPanes();
         String fname = UIFileChooser.open();
-        this.waveform = new ArrayList<Double>();   // create an empty list in the waveform field
+        this.waveform = new ArrayList<>();   // create an empty list in the waveform field
         /*# YOUR CODE HERE */
-        Scanner wav = new Scanner(fname);
-        while(wav.hasNextDouble()){
-            waveform.add(wav.nextDouble());
+        try {
+            List<String> data = Files.readAllLines(Path.of(fname));
+            for (String line : data) {
+                waveform.add(Double.valueOf(line));
+            }
+        } catch (IOException e) {
+            UI.println("File reading failed");
         }
-        for (Double i:waveform) {
-            UI.print(i);
-        }
-
-
-
         UI.printMessage("Read " + this.waveform.size() + " data points from " + fname);
-
 
         this.regionStart = 0;
         this.regionEnd = this.waveform.size();
@@ -172,7 +178,20 @@ public class WaveformAnalyser {
         }
         this.display();
         /*# YOUR CODE HERE */
-
+        min = Double.MAX_VALUE;
+        max = Double.MIN_VALUE;
+        for (double i : waveform) {
+            if (i < min) {
+                min = i;
+            }
+            if (i > max) {
+                max = i;
+            }
+        }
+        UI.setColor(Color.RED);
+        UI.drawLine(GRAPH_LEFT, ZERO_LINE + min, GRAPH_RIGHT, ZERO_LINE + min);
+        UI.setColor(Color.GREEN);
+        UI.drawLine(GRAPH_LEFT, ZERO_LINE + max, GRAPH_RIGHT, ZERO_LINE + max);
     }
 
     /**
@@ -189,7 +208,12 @@ public class WaveformAnalyser {
             return;
         }
         /*# YOUR CODE HERE */
-
+        for (int i = 0; i < waveform.size(); i++) {
+            double value = (i * localWidth) + GRAPH_LEFT;
+            if ((value > regionStart) && (value < regionEnd)) {
+                waveform.set(i, waveform.get(i) * 1.1);
+            }
+        }
         this.display();
     }
 
@@ -207,7 +231,12 @@ public class WaveformAnalyser {
             return;
         }
         /*# YOUR CODE HERE */
-
+        for (int i = 0; i < waveform.size(); i++) {
+            double value = (i * localWidth) + GRAPH_LEFT;
+            if ((value > regionStart) && (value < regionEnd)) {
+                waveform.set(i, waveform.get(i) * 0.9);
+            }
+        }
         this.display();
     }
 
@@ -222,7 +251,9 @@ public class WaveformAnalyser {
             return;
         }
         /*# YOUR CODE HERE */
-
+        for (int i = 0; i < waveform.size(); i++) {
+            if (i % 2 == 0) waveform.remove(i);
+        }
         this.display();
     }
 
@@ -236,7 +267,12 @@ public class WaveformAnalyser {
     public void highlightPeaks() {
         this.display();     //use display if displayDistortion isn't complete
         /*# YOUR CODE HERE */
-
+        for (int i = 1; i < waveform.size() - 1; i++) {
+            if ((waveform.get(i - 1) > waveform.get(i)) && (waveform.get(i + 1) > waveform.get(i))) {
+                UI.setColor(Color.magenta);
+                UI.drawOval((i * localWidth) + GRAPH_LEFT - 4, ZERO_LINE + waveform.get(i) - 4, CIRCLE_SIZE, CIRCLE_SIZE);
+            }
+        }
     }
 
     /**
@@ -256,15 +292,24 @@ public class WaveformAnalyser {
             UI.println("No waveform to display");
             return;
         }
-        UI.clearGraphics();
-
         // draw zero axis
         UI.setColor(Color.black);
         UI.drawLine(GRAPH_LEFT, ZERO_LINE, GRAPH_LEFT + this.waveform.size(), ZERO_LINE);
 
         // draw thresholds
         /*# YOUR CODE HERE */
-
+        UI.setColor(Color.red);
+        for (int index = 1; index < waveform.size() - 1; index++) {
+            double prevSample = waveform.get(index - 1);
+            double sample = waveform.get(index);
+            double nextSample = waveform.get(index + 1);
+            if (sample > THRESHOLD || sample < -THRESHOLD) {
+                UI.drawLine(((index - 1) * localWidth) + GRAPH_LEFT, ZERO_LINE + prevSample, (index * localWidth) + GRAPH_LEFT, ZERO_LINE + sample);
+            }
+            if (nextSample > THRESHOLD || nextSample < -THRESHOLD) {
+                UI.drawLine((index * localWidth) + GRAPH_LEFT, ZERO_LINE + sample, ((index + 1) * localWidth) + GRAPH_LEFT, ZERO_LINE + nextSample);
+            }
+        }
         this.displayRegion();
     }
 
@@ -276,7 +321,12 @@ public class WaveformAnalyser {
      */
     public void deleteRegion() {
         /*# YOUR CODE HERE */
-
+        for (int i = 0; i < waveform.size(); i++) {
+            double value = (i * localWidth) + GRAPH_LEFT;
+            if ((value > regionStart) && (value < regionEnd)) {
+                waveform.remove(i);
+            }
+        }
         this.display();
     }
 
@@ -289,8 +339,9 @@ public class WaveformAnalyser {
      */
     public void duplicateRegion() {
         /*# YOUR CODE HERE */
+        this.display();     //use display if displayDistortion isn't complete
+        /*# YOUR CODE HERE */
 
-        this.display();
     }
 
     /**
@@ -342,7 +393,7 @@ public class WaveformAnalyser {
      * Make a "triangular" waveform file for testing the other methods
      */
     public void makeTriangleWaveForm() {
-        this.waveform = new ArrayList<Double>();
+        this.waveform = new ArrayList<>();
         for (int cycle = 0; cycle < 10; cycle++) {
             for (int i = 0; i < 15; i++) {
                 this.waveform.add(i * 18.0);
